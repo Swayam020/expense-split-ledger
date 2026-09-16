@@ -8,8 +8,10 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: early development.** M0 and M1 are complete — the application boots against a real
-> PostgreSQL instance. The domain model, ledger and REST API are in progress. See [Roadmap](#roadmap).
+> **Status: the core ledger works.** M0–M3 are complete — the REST API creates groups, posts
+> expenses and returns balances derived from the ledger, with **34 tests** green against a real
+> PostgreSQL 17 container. Settlements, idempotency and settlement minimisation are next.
+> See [Roadmap](#roadmap).
 
 ---
 
@@ -181,8 +183,8 @@ interrupted test run may need clearing manually via `podman ps -a`.
 
 - [x] **M0** — Project scaffold, PostgreSQL connection, `/actuator/health` reporting `db: UP`
 - [x] **M1** — Domain model: `Group`, `Member`, `Expense`, `ExpenseShare` with JPA mappings
-- [ ] **M2** — `LedgerEntry` and expense posting, with debits equal to credits after every post
-- [ ] **M3** — REST API: create group, add expense, read derived balances; DTOs and centralised error handling
+- [x] **M2** — `LedgerEntry` and expense posting, with debits equal to credits after every post
+- [x] **M3** — REST API: create group, add expense, read derived balances; DTOs and centralised error handling
 
 **Stage two — correctness and scale**
 
@@ -191,6 +193,68 @@ interrupted test run may need clearing manually via `podman ps -a`.
 - [ ] **M6** — Settlement minimisation, N members reduced to M transfers
 - [ ] **M7** — Testcontainers integration suite and a generated-sequence invariant test in CI
 - [ ] **M8** — Schema diagram, `compose.yaml`, and deployment
+
+---
+
+## API
+
+Three endpoints carry the core ledger. Every response is a DTO — entities are never serialised.
+
+| Method | Path | Does |
+|---|---|---|
+| `POST` | `/api/groups` | Create a group with its members |
+| `POST` | `/api/groups/{id}/expenses` | Post an expense, split equally |
+| `GET`  | `/api/groups/{id}/balances` | Net position per member, derived from the ledger |
+
+### The worked example, end to end
+
+```bash
+GROUP=$(curl -s -X POST localhost:8080/api/groups \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Goa trip","currency":"INR","members":["Alice","Bob","Carol"]}')
+
+GID=$(echo "$GROUP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+AID=$(echo "$GROUP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["members"][0]["id"])')
+
+curl -s -X POST localhost:8080/api/groups/$GID/expenses \
+  -H 'Content-Type: application/json' \
+  -d "{\"payerId\":\"$AID\",\"description\":\"Dinner\",\"amount\":100.00}"
+
+curl -s localhost:8080/api/groups/$GID/balances | python3 -m json.tool
+```
+
+Alice paid ₹100 for three people, so the balances come back as the README promised — and the
+stray paisa is assigned, not dropped:
+
+```json
+{
+  "balanced": true,
+  "balances": [
+    { "memberName": "Alice", "amount":  66.66 },
+    { "memberName": "Bob",   "amount": -33.33 },
+    { "memberName": "Carol", "amount": -33.33 }
+  ]
+}
+```
+
+`balanced` is not decoration. It re-sums every ledger row for the group and asserts the total is
+zero, so the response says whether the books actually reconcile at the moment you read them.
+
+### Errors
+
+One `@RestControllerAdvice` turns every failure into the same JSON shape.
+
+| Case | Status |
+|---|---|
+| Bean-validation failure (negative amount, malformed currency) | `400` |
+| Unknown group | `404` |
+| Broken invariant (payer outside the group, shares that do not reconcile) | `422` |
+
+```json
+{ "error": "Not Found", "message": "no such group: 5077d9c7-…", "timestamp": "2026-09-16T05:14:47Z" }
+```
+
+A rejected invariant is the caller's mistake, not a server fault, so it is `422` rather than `500`.
 
 ---
 
