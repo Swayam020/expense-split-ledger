@@ -8,7 +8,7 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: early development.** M0 is complete — the application boots and connects to a real
+> **Status: early development.** M0 and M1 are complete — the application boots against a real
 > PostgreSQL instance. The domain model, ledger and REST API are in progress. See [Roadmap](#roadmap).
 
 ---
@@ -180,7 +180,7 @@ interrupted test run may need clearing manually via `podman ps -a`.
 **Stage one — core ledger**
 
 - [x] **M0** — Project scaffold, PostgreSQL connection, `/actuator/health` reporting `db: UP`
-- [ ] **M1** — Domain model: `Group`, `Member`, `Expense`, `ExpenseShare` with JPA mappings
+- [x] **M1** — Domain model: `Group`, `Member`, `Expense`, `ExpenseShare` with JPA mappings
 - [ ] **M2** — `LedgerEntry` and expense posting, with debits equal to credits after every post
 - [ ] **M3** — REST API: create group, add expense, read derived balances; DTOs and centralised error handling
 
