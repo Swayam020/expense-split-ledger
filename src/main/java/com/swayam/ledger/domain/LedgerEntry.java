@@ -33,10 +33,15 @@ public class LedgerEntry {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    /** The expense that produced this entry. Null once settlements exist (M4). */
+    /** The expense that produced this entry. Null for a settlement-sourced entry. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "expense_id")
     private Expense expense;
+
+    /** The settlement that produced this entry. Null for an expense-sourced entry. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "settlement_id")
+    private Settlement settlement;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
@@ -53,23 +58,34 @@ public class LedgerEntry {
         // required by JPA
     }
 
-    private LedgerEntry(ExpenseGroup group, Member member, Expense expense,
+    private LedgerEntry(ExpenseGroup group, Member member, Expense expense, Settlement settlement,
                         EntryType type, BigDecimal magnitude) {
         this.group = group;
         this.member = member;
         this.expense = expense;
+        this.settlement = settlement;
         this.type = type;
         this.amount = type == EntryType.CREDIT ? magnitude.abs() : magnitude.abs().negate();
     }
 
-    /** The member put money down: they are owed it back. */
+    /** The member put money down on an expense: they are owed it back. */
     public static LedgerEntry credit(ExpenseGroup group, Member member, Expense expense, BigDecimal magnitude) {
-        return new LedgerEntry(group, member, expense, EntryType.CREDIT, magnitude);
+        return new LedgerEntry(group, member, expense, null, EntryType.CREDIT, magnitude);
     }
 
-    /** The member consumed value: they owe it. */
+    /** The member consumed value from an expense: they owe it. */
     public static LedgerEntry debit(ExpenseGroup group, Member member, Expense expense, BigDecimal magnitude) {
-        return new LedgerEntry(group, member, expense, EntryType.DEBIT, magnitude);
+        return new LedgerEntry(group, member, expense, null, EntryType.DEBIT, magnitude);
+    }
+
+    /** The member paid a settlement: their debt shrinks, so it's a credit. */
+    public static LedgerEntry creditForSettlement(ExpenseGroup group, Member member, Settlement settlement, BigDecimal magnitude) {
+        return new LedgerEntry(group, member, null, settlement, EntryType.CREDIT, magnitude);
+    }
+
+    /** The member received a settlement: what they're owed shrinks, so it's a debit. */
+    public static LedgerEntry debitForSettlement(ExpenseGroup group, Member member, Settlement settlement, BigDecimal magnitude) {
+        return new LedgerEntry(group, member, null, settlement, EntryType.DEBIT, magnitude);
     }
 
     @PrePersist
@@ -81,6 +97,7 @@ public class LedgerEntry {
     public ExpenseGroup getGroup() { return group; }
     public Member getMember() { return member; }
     public Expense getExpense() { return expense; }
+    public Settlement getSettlement() { return settlement; }
     public EntryType getType() { return type; }
     public BigDecimal getAmount() { return amount; }
     public Instant getCreatedAt() { return createdAt; }

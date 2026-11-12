@@ -54,6 +54,18 @@ public final class Dtos {
     public record GroupBalancesResponse(UUID groupId, boolean balanced, List<BalanceResponse> balances) {
     }
 
+    public record CreateSettlementRequest(
+            @NotNull UUID fromMemberId,
+            @NotNull UUID toMemberId,
+            @NotNull
+            @DecimalMin(value = "0.00", inclusive = false, message = "must be positive")
+            @Digits(integer = 15, fraction = 2) BigDecimal amount) {
+    }
+
+    public record SettlementResponse(UUID id, UUID groupId, UUID fromMemberId, UUID toMemberId,
+                                     BigDecimal amount, Instant createdAt) {
+    }
+
     public record ApiError(String error, String message, Instant timestamp) {
     }
 }

@@ -4,7 +4,9 @@ import com.swayam.ledger.api.Dtos.*;
 import com.swayam.ledger.domain.Expense;
 import com.swayam.ledger.domain.ExpenseGroup;
 import com.swayam.ledger.domain.Member;
+import com.swayam.ledger.domain.Settlement;
 import com.swayam.ledger.ledger.LedgerService;
+import com.swayam.ledger.ledger.SettlementService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +22,11 @@ import java.util.UUID;
 public class GroupController {
 
     private final LedgerService ledger;
+    private final SettlementService settlements;
 
-    public GroupController(LedgerService ledger) {
+    public GroupController(LedgerService ledger, SettlementService settlements) {
         this.ledger = ledger;
+        this.settlements = settlements;
     }
 
     @PostMapping
@@ -50,6 +54,16 @@ public class GroupController {
         return new GroupBalancesResponse(groupId, ledger.isBalanced(groupId), balances);
     }
 
+    @PostMapping("/{groupId}/settlements")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SettlementResponse settle(@PathVariable UUID groupId,
+                                     @RequestHeader("Idempotency-Key") String idempotencyKey,
+                                     @Valid @RequestBody CreateSettlementRequest request) {
+        Settlement settlement = settlements.settle(groupId, request.fromMemberId(), request.toMemberId(),
+                request.amount(), idempotencyKey);
+        return toResponse(settlement);
+    }
+
     private static GroupResponse toResponse(ExpenseGroup group) {
         List<MemberResponse> members = group.getMembers().stream()
                 .map(m -> new MemberResponse(m.getId(), m.getName()))
@@ -63,5 +77,11 @@ public class GroupController {
                 .toList();
         return new ExpenseResponse(expense.getId(), expense.getDescription(), expense.getAmount(),
                 expense.getPayer().getId(), expense.getIncurredAt(), shares);
+    }
+
+    private static SettlementResponse toResponse(Settlement settlement) {
+        return new SettlementResponse(settlement.getId(), settlement.getGroup().getId(),
+                settlement.getFromMember().getId(), settlement.getToMember().getId(),
+                settlement.getAmount(), settlement.getCreatedAt());
     }
 }

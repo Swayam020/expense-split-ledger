@@ -8,10 +8,11 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: the core ledger works.** M0–M3 are complete — the REST API creates groups, posts
-> expenses and returns balances derived from the ledger, with **34 tests** green against a real
-> PostgreSQL 17 container. Settlements, idempotency and settlement minimisation are next.
-> See [Roadmap](#roadmap).
+> **Status: settlements are idempotent.** M0–M4 are complete — the REST API creates groups,
+> posts expenses, returns balances derived from the ledger, and settles debts behind an
+> `Idempotency-Key` that survives both retries and genuine concurrent duplicates, with
+> **45 tests** green against a real PostgreSQL 17 container. Settlement minimisation and the
+> frontend are next. See [Roadmap](#roadmap).
 
 ---
 
@@ -188,7 +189,7 @@ interrupted test run may need clearing manually via `podman ps -a`.
 
 **Stage two — correctness and scale**
 
-- [ ] **M4** — Settlements with `Idempotency-Key`, stored request hash and replayed responses
+- [x] **M4** — Settlements with `Idempotency-Key`, stored request hash and replayed responses
 - [ ] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
 - [ ] **M6** — Settlement minimisation, N members reduced to M transfers
 - [ ] **M7** — Testcontainers integration suite and a generated-sequence invariant test in CI
@@ -210,6 +211,7 @@ Three endpoints carry the core ledger. Every response is a DTO — entities are 
 | `POST` | `/api/groups` | Create a group with its members |
 | `POST` | `/api/groups/{id}/expenses` | Post an expense, split equally |
 | `GET`  | `/api/groups/{id}/balances` | Net position per member, derived from the ledger |
+| `POST` | `/api/groups/{id}/settlements` | Settle a debt between two members; requires an `Idempotency-Key` header |
 
 ### The worked example, end to end
 
@@ -252,8 +254,10 @@ One `@RestControllerAdvice` turns every failure into the same JSON shape.
 | Case | Status |
 |---|---|
 | Bean-validation failure (negative amount, malformed currency) | `400` |
+| Missing `Idempotency-Key` header on a settlement | `400` |
 | Unknown group | `404` |
-| Broken invariant (payer outside the group, shares that do not reconcile) | `422` |
+| Broken invariant (payer outside the group, shares that do not reconcile, settling with yourself) | `422` |
+| `Idempotency-Key` reused with a different request body | `409` |
 
 ```json
 { "error": "Not Found", "message": "no such group: 5077d9c7-…", "timestamp": "2026-09-16T05:14:47Z" }

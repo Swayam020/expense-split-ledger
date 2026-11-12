@@ -1,6 +1,7 @@
 package com.swayam.ledger.api;
 
 import com.swayam.ledger.api.Dtos.ApiError;
+import com.swayam.ledger.ledger.IdempotencyConflictException;
 import com.swayam.ledger.ledger.LedgerException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,13 @@ class ApiExceptionHandler {
                 : HttpStatus.UNPROCESSABLE_ENTITY;
         return ResponseEntity.status(status)
                 .body(new ApiError(status.getReasonPhrase(), e.getMessage(), Instant.now()));
+    }
+
+    /** A reused Idempotency-Key with a different body is a conflict, not a validation failure. */
+    @ExceptionHandler(IdempotencyConflictException.class)
+    ResponseEntity<ApiError> onIdempotencyConflict(IdempotencyConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError(HttpStatus.CONFLICT.getReasonPhrase(), e.getMessage(), Instant.now()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
