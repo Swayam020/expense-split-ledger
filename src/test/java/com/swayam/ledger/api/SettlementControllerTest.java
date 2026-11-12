@@ -11,6 +11,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -104,6 +110,37 @@ class SettlementControllerTest {
                                 {"fromMemberId":"%s","toMemberId":"%s","amount":10.00}"""
                                 .formatted(bobId, aliceId)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getsSuggestedSettlementsForAnUnequalThreeWaySplit() throws Exception {
+        JsonNode group = createGroup("Trip", "Alice", "Bob", "Carol");
+        String groupId = group.get("id").asText();
+        String aliceId = group.get("members").get(0).get("id").asText();
+        String bobId = group.get("members").get(1).get("id").asText();
+        String carolId = group.get("members").get(2).get("id").asText();
+
+        mvc.perform(post("/api/groups/" + groupId + "/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"payerId":"%s","description":"Cab","amount":90.00}""".formatted(aliceId)))
+                .andExpect(status().isCreated());
+
+        String body = mvc.perform(get("/api/groups/" + groupId + "/settlements/suggested"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode transfers = json.readTree(body);
+        Set<String> debtors = new HashSet<>();
+        for (int i = 0; i < 2; i++) {
+            JsonNode transfer = transfers.get(i);
+            assertThat(transfer.get("toMemberId").asText()).isEqualTo(aliceId);
+            assertThat(new BigDecimal(transfer.get("amount").asText())).isEqualByComparingTo("30.00");
+            debtors.add(transfer.get("fromMemberId").asText());
+        }
+        // Which debtor is suggested first is the minimiser's business, not the contract's.
+        assertThat(debtors).containsExactlyInAnyOrder(bobId, carolId);
     }
 
     private JsonNode createGroup(String name, String... members) throws Exception {

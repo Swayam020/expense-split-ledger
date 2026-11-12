@@ -64,6 +64,18 @@ public class GroupController {
         return toResponse(settlement);
     }
 
+    /**
+     * Read-only suggestion: nothing is posted here. A client that wants to act on a
+     * transfer calls the idempotent {@code POST /{groupId}/settlements} for it.
+     */
+    @GetMapping("/{groupId}/settlements/suggested")
+    public List<SuggestedTransferResponse> suggestedSettlements(@PathVariable UUID groupId) {
+        return ledger.suggestedSettlements(groupId).stream()
+                .map(t -> new SuggestedTransferResponse(t.fromMemberId(), t.fromMemberName(),
+                        t.toMemberId(), t.toMemberName(), t.amount()))
+                .toList();
+    }
+
     private static GroupResponse toResponse(ExpenseGroup group) {
         List<MemberResponse> members = group.getMembers().stream()
                 .map(m -> new MemberResponse(m.getId(), m.getName()))

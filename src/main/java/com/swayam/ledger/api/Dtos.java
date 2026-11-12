@@ -54,6 +54,11 @@ public final class Dtos {
     public record GroupBalancesResponse(UUID groupId, boolean balanced, List<BalanceResponse> balances) {
     }
 
+    public record SuggestedTransferResponse(UUID fromMemberId, String fromMemberName,
+                                            UUID toMemberId, String toMemberName,
+                                            BigDecimal amount) {
+    }
+
     public record CreateSettlementRequest(
             @NotNull UUID fromMemberId,
             @NotNull UUID toMemberId,

@@ -115,6 +115,12 @@ public class LedgerService {
                 .toList();
     }
 
+    /** The payments that would clear the group's balances; suggests only, posts nothing. */
+    @Transactional(readOnly = true)
+    public List<SettlementMinimizer.Transfer> suggestedSettlements(UUID groupId) {
+        return SettlementMinimizer.minimize(balancesOf(groupId));
+    }
+
     /** True when the group's entries sum to zero, as they always should. */
     @Transactional(readOnly = true)
     public boolean isBalanced(UUID groupId) {
