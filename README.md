@@ -192,7 +192,12 @@ interrupted test run may need clearing manually via `podman ps -a`.
 - [ ] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
 - [ ] **M6** — Settlement minimisation, N members reduced to M transfers
 - [ ] **M7** — Testcontainers integration suite and a generated-sequence invariant test in CI
-- [ ] **M8** — Schema diagram, `compose.yaml`, and deployment
+- [ ] **M8** — Schema diagram, `compose.yaml`, GitHub Actions CI, and a live backend deploy
+
+**Stage three — frontend**
+
+- [ ] **M9** — React frontend: create a group, post an expense, view derived balances
+- [ ] **M10** — Settle-up flow in the UI, PR #1 merged to `main`, frontend deployed alongside the API
 
 ---
 
