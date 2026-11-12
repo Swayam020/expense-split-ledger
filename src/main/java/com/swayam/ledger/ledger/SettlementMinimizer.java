@@ -22,7 +22,10 @@ public final class SettlementMinimizer {
     }
 
     /**
-     * Pairs the largest creditor with the largest debtor until nobody is owed or owing.
+     * Pairs the largest creditor with the largest debtor until one side runs out. For a
+     * zero-sum group, which the ledger guarantees, that leaves nobody owed or owing. Given
+     * balances that don't sum to zero, the unmatched remainder gets no transfer, so check
+     * {@code LedgerService.isBalanced} first rather than trusting the plan to clear it.
      *
      * Every pairing zeroes at least one party, so only the final two can be zeroed by
      * the same transfer: for N non-zero starting balances this emits at most N - 1

@@ -95,6 +95,21 @@ class SettlementMinimizerTest {
         assertThat(parties).doesNotContain(carolId);
     }
 
+    @Test
+    void unbalancedInputSettlesOnlyWhatCanBePairedAndInventsNothing() {
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+
+        List<SettlementMinimizer.Transfer> transfers = SettlementMinimizer.minimize(List.of(
+                new Balance(aliceId, "Alice", new BigDecimal("40.00")),
+                new Balance(bobId, "Bob", new BigDecimal("-30.00"))));
+
+        assertThat(transfers).hasSize(1);
+        assertThat(transfers.get(0).fromMemberId()).isEqualTo(bobId);
+        assertThat(transfers.get(0).toMemberId()).isEqualTo(aliceId);
+        assertThat(transfers.get(0).amount()).isEqualByComparingTo("30.00");
+    }
+
     private static BigDecimal sum(List<Balance> balances) {
         return balances.stream().map(Balance::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }

@@ -8,11 +8,11 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: settlements are idempotent.** M0–M4 are complete — the REST API creates groups,
-> posts expenses, returns balances derived from the ledger, and settles debts behind an
-> `Idempotency-Key` that survives both retries and genuine concurrent duplicates, with
-> **45 tests** green against a real PostgreSQL 17 container. Settlement minimisation and the
-> frontend are next. See [Roadmap](#roadmap).
+> **Status: M0–M6 complete.** The REST API creates groups, posts expenses, returns balances
+> derived from the ledger, settles debts behind an `Idempotency-Key` that survives retries and
+> genuine concurrent duplicates, and suggests the payments that would clear a group (at most
+> N − 1 for N members with a balance). **55 tests** green against a real PostgreSQL 17
+> container. CI, deployment and the frontend are next. See [Roadmap](#roadmap).
 
 ---
 
@@ -190,8 +190,8 @@ interrupted test run may need clearing manually via `podman ps -a`.
 **Stage two — correctness and scale**
 
 - [x] **M4** — Settlements with `Idempotency-Key`, stored request hash and replayed responses
-- [ ] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
-- [ ] **M6** — Settlement minimisation, N members reduced to M transfers
+- [x] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
+- [x] **M6** — Settlement minimisation, N members reduced to M transfers
 - [ ] **M7** — Testcontainers integration suite and a generated-sequence invariant test in CI
 - [ ] **M8** — Schema diagram, `compose.yaml`, GitHub Actions CI, and a live backend deploy
 
@@ -212,6 +212,7 @@ Three endpoints carry the core ledger. Every response is a DTO — entities are 
 | `POST` | `/api/groups/{id}/expenses` | Post an expense, split equally |
 | `GET`  | `/api/groups/{id}/balances` | Net position per member, derived from the ledger |
 | `POST` | `/api/groups/{id}/settlements` | Settle a debt between two members; requires an `Idempotency-Key` header |
+| `GET`  | `/api/groups/{id}/settlements/suggested` | The payments that would clear the group, at most N − 1 for N members with a balance. Read-only |
 
 ### The worked example, end to end
 
@@ -256,7 +257,7 @@ One `@RestControllerAdvice` turns every failure into the same JSON shape.
 | Bean-validation failure (negative amount, malformed currency) | `400` |
 | Missing `Idempotency-Key` header on a settlement | `400` |
 | Unknown group | `404` |
-| Broken invariant (payer outside the group, shares that do not reconcile, settling with yourself) | `422` |
+| Broken invariant (payer outside the group, shares that do not reconcile, settling with yourself, an amount with more than 2 decimal places) | `422` |
 | `Idempotency-Key` reused with a different request body | `409` |
 
 ```json
