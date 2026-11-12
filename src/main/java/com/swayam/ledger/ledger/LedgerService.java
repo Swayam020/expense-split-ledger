@@ -58,6 +58,11 @@ public class LedgerService {
         if (amount == null || amount.signum() <= 0) {
             throw new LedgerException("expense amount must be positive");
         }
+        // stripTrailingZeros first so 100.500 passes: extra scale with no extra
+        // precision is not the error being guarded against.
+        if (amount.stripTrailingZeros().scale() > MoneySplitter.SCALE) {
+            throw new LedgerException("expense amount must have at most " + MoneySplitter.SCALE + " decimal places");
+        }
         ExpenseGroup group = groups.findById(groupId)
                 .orElseThrow(() -> new LedgerException("no such group: " + groupId));
 
