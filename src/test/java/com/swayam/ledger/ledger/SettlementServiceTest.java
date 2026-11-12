@@ -81,13 +81,15 @@ class SettlementServiceTest {
     }
 
     @Test
-    void concurrentDuplicateRequestsProduceExactlyOneSettlement() throws Exception {
+    void oneThousandConcurrentDuplicateRequestsProduceExactlyOneSettlement() throws Exception {
         ExpenseGroup group = ledger.createGroup("Race", "INR", List.of("Alice", "Bob"));
         Member alice = group.getMembers().get(0);
         Member bob = group.getMembers().get(1);
 
-        int attempts = 20;
-        ExecutorService pool = Executors.newFixedThreadPool(attempts);
+        // 1,000 attempts through a bounded pool, not 1,000 raw OS threads — the HikariCP
+        // pool backing the datasource is the real ceiling on in-flight requests anyway.
+        int attempts = 1000;
+        ExecutorService pool = Executors.newFixedThreadPool(64);
         try {
             List<Callable<Settlement>> tasks = IntStream.range(0, attempts)
                     .<Callable<Settlement>>mapToObj(i -> () -> settlements.settle(
