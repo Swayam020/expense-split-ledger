@@ -53,12 +53,12 @@ class LedgerServiceTest {
      * whatever gets posted, the books still sum to zero.
      */
     @Test
-    void theLedgerSumsToZeroAcrossAGeneratedSequenceOfExpenses() {
+    void theLedgerSumsToZeroAcross1000GeneratedExpenses() {
         ExpenseGroup group = ledger.createGroup("Trip", "INR", List.of("A", "B", "C", "D", "E"));
         List<UUID> roster = group.getMembers().stream().map(Member::getId).toList();
         Random random = new Random(20260916L);
 
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 1000; i++) {
             UUID payer = roster.get(random.nextInt(roster.size()));
             List<UUID> participants = roster.subList(0, 1 + random.nextInt(roster.size()));
             BigDecimal amount = BigDecimal.valueOf(random.nextInt(1, 100_000), 2);
