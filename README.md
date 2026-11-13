@@ -8,11 +8,13 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: M0–M6 complete.** The REST API creates groups, posts expenses, returns balances
-> derived from the ledger, settles debts behind an `Idempotency-Key` that survives retries and
-> genuine concurrent duplicates, and suggests the payments that would clear a group (at most
-> N − 1 for N members with a balance). **55 tests** green against a real PostgreSQL 17
-> container. CI, deployment and the frontend are next. See [Roadmap](#roadmap).
+> **Status: M0–M7 complete, M8 in progress.** The REST API creates groups, posts expenses,
+> returns balances derived from the ledger, settles debts behind an `Idempotency-Key` that
+> survives retries and genuine concurrent duplicates, and suggests the payments that would
+> clear a group (at most N − 1 for N members with a balance). **55 tests** green against a real
+> PostgreSQL 17 container, including an invariant checked across 1,000 generated expenses, run
+> on every push by GitHub Actions. Dockerized with Compose. A live deploy and the frontend are
+> next. See [Roadmap](#roadmap).
 
 ---
 
@@ -81,6 +83,81 @@ the same expense always produces the same rows.
 
 ---
 
+## Schema
+
+Six tables. `ledger_entry` is the one that matters — every other table either produces its rows
+(`expense`, `settlement`) or is who they're about (`expense_group`, `member`). No table stores a
+balance; see [Why a ledger instead of a balance column](#why-a-ledger-instead-of-a-balance-column).
+
+```mermaid
+erDiagram
+    EXPENSE_GROUP ||--o{ MEMBER : has
+    EXPENSE_GROUP ||--o{ EXPENSE : has
+    EXPENSE_GROUP ||--o{ LEDGER_ENTRY : has
+    EXPENSE_GROUP ||--o{ SETTLEMENT : has
+    MEMBER ||--o{ EXPENSE : "pays (payer_id)"
+    MEMBER ||--o{ EXPENSE_SHARE : owes
+    MEMBER ||--o{ LEDGER_ENTRY : owns
+    MEMBER ||--o{ SETTLEMENT : "pays (from_member_id)"
+    MEMBER ||--o{ SETTLEMENT : "receives (to_member_id)"
+    EXPENSE ||--o{ EXPENSE_SHARE : "splits into"
+    EXPENSE ||--o{ LEDGER_ENTRY : "produces, nullable"
+    SETTLEMENT ||--o{ LEDGER_ENTRY : "produces, nullable"
+
+    EXPENSE_GROUP {
+        uuid id PK
+        string name
+        string currency "ISO-4217, 3 chars"
+        instant created_at
+    }
+    MEMBER {
+        uuid id PK
+        uuid group_id FK
+        string name
+    }
+    EXPENSE {
+        uuid id PK
+        uuid group_id FK
+        uuid payer_id FK
+        string description
+        decimal amount "precision 19, scale 4"
+        instant incurred_at
+        instant created_at
+    }
+    EXPENSE_SHARE {
+        uuid id PK
+        uuid expense_id FK
+        uuid member_id FK
+        decimal amount
+    }
+    LEDGER_ENTRY {
+        uuid id PK
+        uuid group_id FK
+        uuid member_id FK
+        uuid expense_id FK "nullable"
+        uuid settlement_id FK "nullable"
+        string type "CREDIT or DEBIT"
+        decimal amount "signed: + credit, - debit"
+        instant created_at
+    }
+    SETTLEMENT {
+        uuid id PK
+        uuid group_id FK
+        uuid from_member_id FK
+        uuid to_member_id FK
+        decimal amount
+        string idempotency_key UK
+        string request_hash "sha-256 of the request body"
+        instant created_at
+    }
+```
+
+`LEDGER_ENTRY` is never updated or deleted — a correction is a new pair of entries, so the
+history stays auditable. `expense_id` and `settlement_id` are mutually exclusive and both
+nullable: every row was produced by exactly one of the two.
+
+---
+
 ## Getting started
 
 ### Prerequisites
@@ -89,7 +166,22 @@ the same expense always produces the same rows.
 - A container runtime — Docker or Podman
 - No local Maven installation is required; the repository ships the Maven Wrapper
 
-### 1. Start PostgreSQL
+### Option A — Docker Compose (fastest)
+
+```bash
+docker compose up --build
+```
+
+Builds the app image, starts PostgreSQL, and waits for the database healthcheck before
+starting the app. The API is on `localhost:8080` once `docker compose logs -f app` shows
+`Started LedgerApplication`. Stop with `docker compose down -v` (the `-v` also drops the
+Postgres volume, so the next `up` starts from an empty database).
+
+Podman is a drop-in substitute: `podman compose up --build`.
+
+### Option B — run the app from source, against a container database
+
+#### 1. Start PostgreSQL
 
 ```bash
 docker run -d --name ledger-pg -p 5432:5432 \
@@ -100,7 +192,7 @@ docker run -d --name ledger-pg -p 5432:5432 \
 Podman is a drop-in substitute — replace `docker` with `podman` and use the fully qualified
 image name `docker.io/library/postgres:17`.
 
-### 2. Run the application
+#### 2. Run the application
 
 ```bash
 ./mvnw spring-boot:run
@@ -108,7 +200,7 @@ image name `docker.io/library/postgres:17`.
 
 The application starts on port 8080 and creates its schema on first run.
 
-### 3. Verify
+#### 3. Verify
 
 ```bash
 curl -s localhost:8080/actuator/health | python3 -m json.tool
@@ -192,8 +284,8 @@ interrupted test run may need clearing manually via `podman ps -a`.
 - [x] **M4** — Settlements with `Idempotency-Key`, stored request hash and replayed responses
 - [x] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
 - [x] **M6** — Settlement minimisation, N members reduced to M transfers
-- [ ] **M7** — Testcontainers integration suite and a generated-sequence invariant test in CI
-- [ ] **M8** — Schema diagram, `compose.yaml`, GitHub Actions CI, and a live backend deploy
+- [x] **M7** — Generated-sequence invariant test grown to 1,000 expenses; GitHub Actions CI running the suite on every push
+- [ ] **M8** — Schema diagram and `compose.yaml` done; live backend deploy pending
 
 **Stage three — frontend**
 
