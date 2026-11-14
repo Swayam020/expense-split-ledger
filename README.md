@@ -13,8 +13,8 @@ recalculated and hoped over.
 > survives retries and genuine concurrent duplicates, and suggests the payments that would
 > clear a group (at most N − 1 for N members with a balance). **55 tests** green against a real
 > PostgreSQL 17 container, including an invariant checked across 1,000 generated expenses, run
-> on every push by GitHub Actions. Dockerized with Compose. A live deploy and the frontend are
-> next. See [Roadmap](#roadmap).
+> on every push by GitHub Actions. Dockerized with Compose, deploy config ready for Render. A
+> live deploy and the frontend are next. See [Deploy](#deploy) and [Roadmap](#roadmap).
 
 ---
 
@@ -229,8 +229,8 @@ same thing. The `db` component is what distinguishes *started* from *connected*.
 
 | Property                         | Default                                  | Notes                                     |
 |----------------------------------|------------------------------------------|-------------------------------------------|
-| `spring.datasource.url`          | `jdbc:postgresql://localhost:5432/ledger` | JDBC connection string                    |
-| `spring.datasource.username`     | `postgres`                               |                                           |
+| `spring.datasource.url`          | `jdbc:postgresql://localhost:5432/ledger` | Reads `SPRING_DATASOURCE_URL`; falls back for local dev |
+| `spring.datasource.username`     | `postgres`                               | Reads `DB_USERNAME`; Supabase's pooler username includes a project ref (`postgres.<ref>`) |
 | `spring.datasource.password`     | `${DB_PASSWORD:ledger}`                  | Reads `DB_PASSWORD`; falls back for local dev |
 | `spring.jpa.hibernate.ddl-auto`  | `update`                                 | Development convenience; not for production |
 | `spring.jpa.open-in-view`        | `false`                                  | Disabled so lazy-loading faults surface in tests |
@@ -270,6 +270,36 @@ interrupted test run may need clearing manually via `podman ps -a`.
 
 ---
 
+## Deploy
+
+The app deploys as a container to [Render](https://render.com)'s free web-service tier, against
+a [Supabase](https://supabase.com) free Postgres database rather than Render's own — Render's
+free-tier databases expire and are deleted after 30 days, which would kill a link a recruiter
+clicks on in month two. Supabase's free Postgres project does not expire.
+
+`render.yaml` in the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec):
+a Docker web service built from the committed `Dockerfile`, with `SPRING_DATASOURCE_URL`,
+`DB_USERNAME` and `DB_PASSWORD` left unset (`sync: false`) so no credential is committed.
+
+1. Create a free Supabase project. From its dashboard, **Connect** → copy the **Transaction
+   pooler** connection string (port 6543) — direct connections aren't reachable from Render's
+   network. Note the host, the pooler username (`postgres.<project-ref>`), and the database
+   password you set at project creation.
+2. On Render: **New** → **Blueprint**, point it at this GitHub repo. Render reads `render.yaml`
+   and proposes the one web service.
+3. Before the first deploy, set the three environment variables on that service:
+   - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<pooler-host>:6543/postgres`
+   - `DB_USERNAME` = `postgres.<project-ref>`
+   - `DB_PASSWORD` = the Supabase project password
+4. Deploy. `spring.jpa.hibernate.ddl-auto=update` creates the schema on first boot. Verify with
+   `curl -s https://<service>.onrender.com/actuator/health` — look for `"db": {"status": "UP"}`
+   exactly as in [Verify](#3-verify) above.
+
+Render's free web services spin down after 15 minutes idle and cold-start in a few seconds on
+the next request — expected, not a bug.
+
+---
+
 ## Roadmap
 
 **Stage one — core ledger**
@@ -285,7 +315,7 @@ interrupted test run may need clearing manually via `podman ps -a`.
 - [x] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
 - [x] **M6** — Settlement minimisation, N members reduced to M transfers
 - [x] **M7** — Generated-sequence invariant test grown to 1,000 expenses; GitHub Actions CI running the suite on every push
-- [ ] **M8** — Schema diagram and `compose.yaml` done; live backend deploy pending
+- [ ] **M8** — Schema diagram, `compose.yaml` and Render deploy config done; live backend deploy pending his Render/Supabase accounts
 
 **Stage three — frontend**
 
