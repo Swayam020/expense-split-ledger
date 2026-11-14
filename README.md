@@ -8,13 +8,14 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: M0–M7 complete, M8 in progress.** The REST API creates groups, posts expenses,
-> returns balances derived from the ledger, settles debts behind an `Idempotency-Key` that
-> survives retries and genuine concurrent duplicates, and suggests the payments that would
-> clear a group (at most N − 1 for N members with a balance). **55 tests** green against a real
-> PostgreSQL 17 container, including an invariant checked across 1,000 generated expenses, run
-> on every push by GitHub Actions. Dockerized with Compose, deploy config ready for Render. A
-> live deploy and the frontend are next. See [Deploy](#deploy) and [Roadmap](#roadmap).
+> **Status: M0–M8 complete.** The REST API creates groups, posts expenses, returns balances
+> derived from the ledger, settles debts behind an `Idempotency-Key` that survives retries and
+> genuine concurrent duplicates, and suggests the payments that would clear a group (at most
+> N − 1 for N members with a balance). **55 tests** green against a real PostgreSQL 17
+> container, including an invariant checked across 1,000 generated expenses, run on every push
+> by GitHub Actions. Dockerized with Compose and deployed live on Render against a Supabase
+> Postgres instance: **https://expense-split-ledger.onrender.com**. The frontend is next. See
+> [Deploy](#deploy) and [Roadmap](#roadmap).
 
 ---
 
@@ -315,7 +316,7 @@ the next request — expected, not a bug.
 - [x] **M5** — `BigDecimal` audit: scale, rounding mode and deterministic remainder assignment
 - [x] **M6** — Settlement minimisation, N members reduced to M transfers
 - [x] **M7** — Generated-sequence invariant test grown to 1,000 expenses; GitHub Actions CI running the suite on every push
-- [ ] **M8** — Schema diagram, `compose.yaml` and Render deploy config done; live backend deploy pending his Render/Supabase accounts
+- [x] **M8** — Schema diagram, `compose.yaml`, and a live backend deploy: Render running the Dockerized app against a Supabase Postgres instance, `/actuator/health` reporting `db: UP`
 
 **Stage three — frontend**
 
