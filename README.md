@@ -8,14 +8,16 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: M0–M8 complete.** The REST API creates groups, posts expenses, returns balances
+> **Status: M0–M9 complete.** The REST API creates groups, posts expenses, returns balances
 > derived from the ledger, settles debts behind an `Idempotency-Key` that survives retries and
 > genuine concurrent duplicates, and suggests the payments that would clear a group (at most
-> N − 1 for N members with a balance). **55 tests** green against a real PostgreSQL 17
-> container, including an invariant checked across 1,000 generated expenses, run on every push
-> by GitHub Actions. Dockerized with Compose and deployed live on Render against a Supabase
-> Postgres instance: **https://expense-split-ledger.onrender.com**. The frontend is next. See
-> [Deploy](#deploy) and [Roadmap](#roadmap).
+> N − 1 for N members with a balance). **56 backend + 8 frontend tests** green, the backend
+> against a real PostgreSQL 17 container including an invariant checked across 1,000 generated
+> expenses, both run on every push by GitHub Actions. A React frontend (`frontend/`) drives
+> the core flow: create a group, post an expense, watch balances update. Dockerized with
+> Compose and deployed live on Render against a Supabase Postgres instance:
+> **https://expense-split-ledger.onrender.com**. The frontend isn't deployed yet — settle-up
+> in the UI and the deploy are next. See [Deploy](#deploy) and [Roadmap](#roadmap).
 
 ---
 
@@ -224,6 +226,19 @@ A healthy instance reports the database component explicitly:
 A bare `{"status":"UP"}` is not sufficient — an application with no database at all returns the
 same thing. The `db` component is what distinguishes *started* from *connected*.
 
+### Option C — the frontend
+
+With the API running on `localhost:8080` (either option above):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Opens on `localhost:5173`. The backend's CORS config (`app.frontend-origin`) allows that
+origin by default — see [Configuration](#configuration) if you run the frontend elsewhere.
+
 ---
 
 ## Configuration
@@ -235,9 +250,13 @@ same thing. The `db` component is what distinguishes *started* from *connected*.
 | `spring.datasource.password`     | `${DB_PASSWORD:ledger}`                  | Reads `DB_PASSWORD`; falls back for local dev |
 | `spring.jpa.hibernate.ddl-auto`  | `update`                                 | Development convenience; not for production |
 | `spring.jpa.open-in-view`        | `false`                                  | Disabled so lazy-loading faults surface in tests |
+| `app.frontend-origin`            | `http://localhost:5173`                  | Reads `FRONTEND_ORIGIN`; the one origin the API's CORS config allows |
 
 Override any of these with an environment variable rather than editing the committed file, for
 example `DB_PASSWORD=… ./mvnw spring-boot:run`.
+
+The frontend has its own `VITE_API_BASE_URL` (default `http://localhost:8080`), read at build
+time — set it in `frontend/.env` or the environment before `npm run build`.
 
 ---
 
@@ -267,7 +286,19 @@ export TESTCONTAINERS_RYUK_DISABLED=true
 privileges that rootless Podman does not grant. With it disabled, containers from an
 interrupted test run may need clearing manually via `podman ps -a`.
 
+On an 8GB machine running other containers or processes at the same time, a second
+Testcontainers Postgres starting mid-suite can occasionally fail with a "Broken pipe" from
+Podman's API socket — a resource-pressure flake, not a test failure. Re-run; CI (GitHub
+Actions, dedicated resources) is the authoritative signal either way.
+
 </details>
+
+```bash
+cd frontend
+npm test
+```
+
+Runs the Vitest suite (jsdom, no real backend — every `fetch` call is mocked).
 
 ---
 
@@ -320,7 +351,7 @@ the next request — expected, not a bug.
 
 **Stage three — frontend**
 
-- [ ] **M9** — React frontend: create a group, post an expense, view derived balances
+- [x] **M9** — React frontend: create a group, post an expense, view derived balances
 - [ ] **M10** — Settle-up flow in the UI, PR #1 merged to `main`, frontend deployed alongside the API
 
 ---
@@ -402,6 +433,10 @@ src/test/java/com/swayam/ledger/
 ├── LedgerApplicationTests.java
 ├── TestcontainersConfiguration.java   PostgreSQL container wired via @ServiceConnection
 └── TestLedgerApplication.java         local entry point backed by Testcontainers
+
+frontend/src/
+├── api/              fetch wrapper (client.ts) and TypeScript types mirroring Dtos.java
+└── components/       CreateGroupForm, ExpenseForm, BalancesView — each with a co-located test
 ```
 
 `TestLedgerApplication` runs the application against a throwaway PostgreSQL container instead of

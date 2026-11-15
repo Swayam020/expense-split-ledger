@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { CreateGroupForm } from './components/CreateGroupForm'
+import { ExpenseForm } from './components/ExpenseForm'
+import { BalancesView } from './components/BalancesView'
 import type { GroupResponse } from './api/types'
 
 function App() {
   const [group, setGroup] = useState<GroupResponse | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   return (
     <main>
@@ -20,6 +23,12 @@ function App() {
               <li key={member.id}>{member.name}</li>
             ))}
           </ul>
+          <ExpenseForm
+            groupId={group.id}
+            members={group.members}
+            onPosted={() => setRefreshKey((key) => key + 1)}
+          />
+          <BalancesView groupId={group.id} refreshKey={refreshKey} />
         </>
       )}
     </main>
