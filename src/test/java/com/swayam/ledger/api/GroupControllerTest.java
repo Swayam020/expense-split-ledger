@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -103,5 +104,14 @@ class GroupControllerTest {
                                 {"payerId":"%s","description":"Nope","amount":10.00}"""
                                 .formatted(java.util.UUID.randomUUID())))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void aPreflightRequestFromTheConfiguredOriginIsAllowed() throws Exception {
+        mvc.perform(options("/api/groups")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 }
