@@ -8,16 +8,17 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: M0–M9 complete.** The REST API creates groups, posts expenses, returns balances
-> derived from the ledger, settles debts behind an `Idempotency-Key` that survives retries and
-> genuine concurrent duplicates, and suggests the payments that would clear a group (at most
-> N − 1 for N members with a balance). **56 backend + 8 frontend tests** green, the backend
-> against a real PostgreSQL 17 container including an invariant checked across 1,000 generated
-> expenses, both run on every push by GitHub Actions. A React frontend (`frontend/`) drives
-> the core flow: create a group, post an expense, watch balances update. Dockerized with
-> Compose and deployed live on Render against a Supabase Postgres instance:
-> **https://expense-split-ledger.onrender.com**. The frontend isn't deployed yet — settle-up
-> in the UI and the deploy are next. See [Deploy](#deploy) and [Roadmap](#roadmap).
+> **Status: M0–M9 complete, M10 in progress.** The REST API creates groups, posts expenses,
+> returns balances derived from the ledger, settles debts behind an `Idempotency-Key` that
+> survives retries and genuine concurrent duplicates, and suggests the payments that would
+> clear a group (at most N − 1 for N members with a balance). **56 backend + 12 frontend
+> tests** green, the backend against a real PostgreSQL 17 container including an invariant
+> checked across 1,000 generated expenses, both run on every push by GitHub Actions. A React
+> frontend (`frontend/`) drives the full flow: create a group, post an expense, watch balances
+> update, settle a suggested transfer. Dockerized with Compose and deployed live on Render
+> against a Supabase Postgres instance: **https://expense-split-ledger.onrender.com**. The
+> frontend isn't deployed yet — that's the last piece of M10. See [Deploy](#deploy) and
+> [Roadmap](#roadmap).
 
 ---
 
@@ -309,26 +310,34 @@ a [Supabase](https://supabase.com) free Postgres database rather than Render's o
 free-tier databases expire and are deleted after 30 days, which would kill a link a recruiter
 clicks on in month two. Supabase's free Postgres project does not expire.
 
-`render.yaml` in the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec):
-a Docker web service built from the committed `Dockerfile`, with `SPRING_DATASOURCE_URL`,
-`DB_USERNAME` and `DB_PASSWORD` left unset (`sync: false`) so no credential is committed.
+`render.yaml` in the repo root is a [Render Blueprint](https://render.com/docs/blueprint-spec)
+with two services: a Docker web service for the API, built from the committed `Dockerfile`
+with `SPRING_DATASOURCE_URL`, `DB_USERNAME` and `DB_PASSWORD` left unset (`sync: false`) so no
+credential is committed; and a static site for `frontend/`, built with `npm install && npm run
+build` and served from `frontend/dist`.
 
 1. Create a free Supabase project. From its dashboard, **Connect** → copy the **Transaction
    pooler** connection string (port 6543) — direct connections aren't reachable from Render's
    network. Note the host, the pooler username (`postgres.<project-ref>`), and the database
    password you set at project creation.
 2. On Render: **New** → **Blueprint**, point it at this GitHub repo. Render reads `render.yaml`
-   and proposes the one web service.
-3. Before the first deploy, set the three environment variables on that service:
+   and proposes both services.
+3. Before the first deploy, set the three API environment variables:
    - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<pooler-host>:6543/postgres`
    - `DB_USERNAME` = `postgres.<project-ref>`
    - `DB_PASSWORD` = the Supabase project password
-4. Deploy. `spring.jpa.hibernate.ddl-auto=update` creates the schema on first boot. Verify with
-   `curl -s https://<service>.onrender.com/actuator/health` — look for `"db": {"status": "UP"}`
-   exactly as in [Verify](#3-verify) above.
+   `FRONTEND_ORIGIN` (on the API) and `VITE_API_BASE_URL` (on the static site) are already set
+   in `render.yaml` to each other's expected `*.onrender.com` URL — correct as long as the
+   service names in the Blueprint proposal match `render.yaml`'s `name:` fields; if Render
+   suffixes either name to avoid a collision, update the other service's env var to match
+   before the first deploy.
+4. Deploy. `spring.jpa.hibernate.ddl-auto=update` creates the schema on first boot. Verify the
+   API with `curl -s https://<api-service>.onrender.com/actuator/health` — look for `"db":
+   {"status": "UP"}` exactly as in [Verify](#3-verify) above — and the frontend by opening its
+   URL and creating a group.
 
 Render's free web services spin down after 15 minutes idle and cold-start in a few seconds on
-the next request — expected, not a bug.
+the next request — expected, not a bug. Render's free static sites don't spin down.
 
 ---
 
