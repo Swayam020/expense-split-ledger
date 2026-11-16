@@ -12,3 +12,15 @@ services:
         sync: false
       - key: DB_PASSWORD
         sync: false
+      - key: FRONTEND_ORIGIN
+        value: https://expense-split-ledger-frontend.onrender.com
+
+  - type: web
+    name: expense-split-ledger-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://expense-split-ledger.onrender.com
