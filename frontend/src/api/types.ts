@@ -53,6 +53,29 @@ export interface GroupBalancesResponse {
   balances: BalanceResponse[]
 }
 
+export interface SuggestedTransferResponse {
+  fromMemberId: string
+  fromMemberName: string
+  toMemberId: string
+  toMemberName: string
+  amount: number
+}
+
+export interface CreateSettlementRequest {
+  fromMemberId: string
+  toMemberId: string
+  amount: number
+}
+
+export interface SettlementResponse {
+  id: string
+  groupId: string
+  fromMemberId: string
+  toMemberId: string
+  amount: number
+  createdAt: string
+}
+
 export interface ApiError {
   error: string
   message: string

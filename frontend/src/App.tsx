@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CreateGroupForm } from './components/CreateGroupForm'
 import { ExpenseForm } from './components/ExpenseForm'
 import { BalancesView } from './components/BalancesView'
+import { SettleUpView } from './components/SettleUpView'
 import type { GroupResponse } from './api/types'
 
 function App() {
@@ -29,6 +30,11 @@ function App() {
             onPosted={() => setRefreshKey((key) => key + 1)}
           />
           <BalancesView groupId={group.id} refreshKey={refreshKey} />
+          <SettleUpView
+            groupId={group.id}
+            refreshKey={refreshKey}
+            onSettled={() => setRefreshKey((key) => key + 1)}
+          />
         </>
       )}
     </main>

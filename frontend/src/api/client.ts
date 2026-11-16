@@ -2,9 +2,12 @@ import type {
   ApiError,
   CreateExpenseRequest,
   CreateGroupRequest,
+  CreateSettlementRequest,
   ExpenseResponse,
   GroupBalancesResponse,
   GroupResponse,
+  SettlementResponse,
+  SuggestedTransferResponse,
 } from './types'
 
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
@@ -58,4 +61,35 @@ export async function getBalances(groupId: string): Promise<GroupBalancesRespons
     throw await toFailure(response)
   }
   return (await response.json()) as GroupBalancesResponse
+}
+
+/** Suggestions are derived from balances server-side, so the UI never minimizes anything. */
+export async function getSuggestedSettlements(
+  groupId: string,
+): Promise<SuggestedTransferResponse[]> {
+  const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/settlements/suggested`)
+  if (!response.ok) {
+    throw await toFailure(response)
+  }
+  return (await response.json()) as SuggestedTransferResponse[]
+}
+
+/**
+ * The key makes a retry (or a double click) land on the settlement already written,
+ * so the caller generates one per click rather than per transfer.
+ */
+export async function settleUp(
+  groupId: string,
+  req: CreateSettlementRequest,
+  idempotencyKey: string,
+): Promise<SettlementResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/groups/${groupId}/settlements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(req),
+  })
+  if (!response.ok) {
+    throw await toFailure(response)
+  }
+  return (await response.json()) as SettlementResponse
 }
