@@ -8,7 +8,7 @@ recalculated and hoped over.
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)
 
-> **Status: M0–M9 complete, M10 in progress.** The REST API creates groups, posts expenses,
+> **Status: M0–M10 complete.** The REST API creates groups, posts expenses,
 > returns balances derived from the ledger, settles debts behind an `Idempotency-Key` that
 > survives retries and genuine concurrent duplicates, and suggests the payments that would
 > clear a group (at most N − 1 for N members with a balance). **56 backend + 12 frontend
@@ -16,8 +16,8 @@ recalculated and hoped over.
 > checked across 1,000 generated expenses, both run on every push by GitHub Actions. A React
 > frontend (`frontend/`) drives the full flow: create a group, post an expense, watch balances
 > update, settle a suggested transfer. Dockerized with Compose and deployed live on Render
-> against a Supabase Postgres instance: **https://expense-split-ledger.onrender.com**. The
-> frontend isn't deployed yet — that's the last piece of M10. See [Deploy](#deploy) and
+> against a Supabase Postgres instance: API **https://expense-split-ledger.onrender.com**,
+> frontend **https://expense-split-ledger-frontend.onrender.com**. See [Deploy](#deploy) and
 > [Roadmap](#roadmap).
 
 ---
@@ -323,7 +323,11 @@ build` and served from `frontend/dist`.
 2. On Render: **New** → **Blueprint**, point it at this GitHub repo. Render reads `render.yaml`
    and proposes both services.
 3. Before the first deploy, set the three API environment variables:
-   - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<pooler-host>:6543/postgres`
+   - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<pooler-host>:6543/postgres?prepareThreshold=0`
+     — the transaction pooler hands each transaction a different server connection, so the
+     JDBC driver's server-side prepared statements break (`prepared statement "S_1" already
+     exists`); `prepareThreshold=0` turns them off. Health checks pass without it — the
+     failure only shows on the second query a connection runs.
    - `DB_USERNAME` = `postgres.<project-ref>`
    - `DB_PASSWORD` = the Supabase project password
    `FRONTEND_ORIGIN` (on the API) and `VITE_API_BASE_URL` (on the static site) are already set
@@ -361,7 +365,7 @@ the next request — expected, not a bug. Render's free static sites don't spin 
 **Stage three — frontend**
 
 - [x] **M9** — React frontend: create a group, post an expense, view derived balances
-- [ ] **M10** — Settle-up flow in the UI, PR #1 merged to `main`, frontend deployed alongside the API
+- [x] **M10** — Settle-up flow in the UI, PR #1 merged to `main`, frontend deployed alongside the API
 
 ---
 
